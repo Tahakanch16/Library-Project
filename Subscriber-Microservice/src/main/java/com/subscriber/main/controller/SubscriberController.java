@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -25,9 +26,10 @@ import org.springframework.web.client.RestTemplate;
 import com.subscriber.main.model.BookModel;
 import com.subscriber.main.model.SubscriberModel;
 import com.subscriber.main.services.SubscriberService;
+import com.subscriber.main.utility.FeignClientUtility;
 
 @RestController
-@RequestMapping("/library")
+@RequestMapping("/users")
 public class SubscriberController {
 	
 	@Autowired
@@ -35,6 +37,9 @@ public class SubscriberController {
 	
 	@Autowired
 	RestTemplate restTemplate;
+	
+	@Autowired
+	FeignClientUtility utility;
 	
 	@GetMapping("/subscriber")
 	public ResponseEntity<List<SubscriberModel>> getAllSubscriber(){
@@ -61,8 +66,9 @@ public class SubscriberController {
 		
 		SubscriberModel subscriberDetails=new SubscriberModel();
 		
-		BookModel book=this.restTemplate.getForObject("http://book-microservice/library/book/"+subscriber.getBookId(),BookModel.class);
-//		System.out.println(book);
+//		BookModel book=this.restTemplate.getForObject("http://book-microservice/library/book/"+subscriber.getBookId(),BookModel.class);
+		BookModel book=utility.getBookById(subscriber.getBookId());
+		System.out.println(book);
 		if(book.getAvailableCopies() != 0 && book.getAvailableCopies() <= book.getTotalCopies()) {
 			
 			try {
@@ -72,7 +78,8 @@ public class SubscriberController {
 				availableBooks--;
 				
 				BookModel bookModel=new BookModel(availableBooks);
-				restTemplate.put("http://book-microservice/library/book/"+subscriber.getBookId(), bookModel);
+//				restTemplate.put("http://book-microservice/library/book/"+subscriber.getBookId(), bookModel);
+				utility.updateBookById(subscriber.getBookId(),bookModel);
 				
 				return ResponseEntity.of(Optional.of(subscriberDetails));
 			} 
@@ -95,14 +102,16 @@ public class SubscriberController {
 			
 			subscriberDetails=service.getSubscriberById(id);
 			
-			BookModel book=this.restTemplate.getForObject("http://book-microservice/library/book/"+subscriberDetails.getBookId(),BookModel.class);
-			
+//			BookModel book=this.restTemplate.getForObject("http://book-microservice/library/book/"+subscriberDetails.getBookId(),BookModel.class);
+			BookModel book=utility.getBookById(subscriberDetails.getBookId());
 				int availableBooks=book.getAvailableCopies();
 				availableBooks++;
 				
 				
 				BookModel bookModel=new BookModel(availableBooks);
-				restTemplate.put("http://book-microservice/library/book/"+subscriberDetails.getBookId(), bookModel);
+//				restTemplate.put("http://book-microservice/library/book/"+subscriberDetails.getBookId(), bookModel);
+				utility.updateBookById(subscriberDetails.getBookId(),bookModel);
+				
 				
 				service.deleteSubscriberById(id);
 				return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
@@ -115,5 +124,17 @@ public class SubscriberController {
 		}
 		
 		
+	}
+	
+	@GetMapping("/mybooks")
+	public List<BookModel> getAllBooks(){
+		return utility.getAllBook();
+	}
+	
+	@GetMapping("/loadbalancer")
+	public String LoadBalancer() {
+		 String data=restTemplate.getForObject("http://book-microservice/library/load", String.class);
+//		 System.out.println(data);
+		 return data;
 	}
 }
